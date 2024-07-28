@@ -1,0 +1,504 @@
+openapi: 3.0.0
+info:
+  title: LedgerBox API Documentation
+  version: 1.0.0
+  description: |
+    # Introduction
+    Welcome to the LedgerBox API documentation. Our powerful API allows you to process various types of financial documents, including invoices, receipts, and bank statements, converting them into structured JSON data with unparalleled accuracy and speed.
+
+    # Key Features
+    - **Document Types**: Process invoices, receipts, bank statements, and more.
+    - **High Accuracy**: Industry-leading accuracy with over 99% precision on key data fields.
+    - **Fast Processing**: Handle thousands of documents per minute with our scalable infrastructure.
+    - **Flexible Integration**: Easily integrate our API into your existing workflows and systems.
+    - **Secure and Compliant**: Strict data security and compliance measures to protect your sensitive information.
+
+    # Getting Started
+    To start using the LedgerBox API, follow these steps:
+    1. Sign up for an account at [https://ledgerbox.com](https://ledgerbox.com)
+    2. Obtain your API key from the dashboard
+    3. Use your API key to authenticate requests to our API endpoints
+
+    # Authentication
+    The LedgerBox API uses API key authentication. Include your API key in the `x-api-key` header with every request.
+
+    Example:
+    ```
+    x-api-key: your_api_key_here
+    ```
+
+    # Rate Limiting
+    Our API implements rate limiting to ensure fair usage. You are limited to 1000 requests per minute. If you exceed this limit, you'll receive a 429 Too Many Requests response.
+
+servers:
+  - url: https://api.ledgerbox.com/v1
+    description: Production server
+
+tags:
+  - name: Upload
+    description: Endpoints for uploading documents
+  - name: Job
+    description: Endpoints for managing and checking job status
+  - name: Export
+    description: Endpoints for exporting processed data
+
+paths:
+  /api/protected/upload:
+    post:
+      summary: Upload files to be processed by a specified model
+      description: Upload files for processing by a specified model. Maximum 10 files per request.
+      tags:
+        - Upload
+      parameters:
+        - in: query
+          name: model
+          required: true
+          schema:
+            type: string
+            enum: [invoice, receipt, bankstatement]
+          description: The model to process the files with
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                files:
+                  type: array
+                  items:
+                    type: string
+                    format: binary
+                  description: The files to be uploaded (between 1 and 10 files)
+      responses:
+        "200":
+          description: Files uploaded successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UploadResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /api/protected/job:
+    get:
+      summary: Get the status of a job
+      description: Poll for the status of a job by providing a valid job ID
+      tags:
+        - Job
+      parameters:
+        - in: query
+          name: jobId
+          required: true
+          schema:
+            type: string
+          description: The ID of the job to poll the status for
+      responses:
+        "200":
+          description: Job status retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JobStatus"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/protected/export:
+    get:
+      summary: Export job results
+      description: Export the results of a completed job by providing a valid job ID
+      tags:
+        - Export
+      parameters:
+        - in: query
+          name: jobId
+          required: true
+          schema:
+            type: string
+          description: The ID of the job to export results for
+      responses:
+        "200":
+          description: Job results exported successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExportResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: x-api-key
+
+  responses:
+    BadRequest:
+      description: Bad request
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    Unauthorized:
+      description: Unauthorized, invalid API key
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+
+  schemas:
+    Error:
+      type: object
+      properties:
+        message:
+          type: string
+          example: Error message details
+
+    UploadResponse:
+      type: object
+      properties:
+        message:
+          type: string
+          example: Files uploaded successfully
+        results:
+          type: object
+          properties:
+            jobId:
+              type: string
+              example: job-12345
+            jobStatus:
+              type: string
+              enum: [success, error, pending]
+              example: pending
+            documentIds:
+              type: array
+              items:
+                type: string
+              example: ["doc-67890", "doc-54321"]
+
+    JobStatus:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [success, error, pending]
+          example: pending
+
+    ExportResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [success, error, pending]
+          example: success
+        jobId:
+          type: string
+          example: job-12345
+        content:
+          type: array
+          items:
+            oneOf:
+              - $ref: "#/components/schemas/Invoice"
+              - $ref: "#/components/schemas/BankStatement"
+              - $ref: "#/components/schemas/Receipt"
+
+    Invoice:
+      type: object
+      properties:
+        CustomerName:
+          type: string
+          nullable: true
+        CustomerId:
+          type: string
+          nullable: true
+        PurchaseOrder:
+          type: string
+          nullable: true
+        InvoiceId:
+          type: string
+          nullable: true
+        InvoiceDate:
+          type: string
+          format: date
+          nullable: true
+        DueDate:
+          type: string
+          format: date
+          nullable: true
+        VendorName:
+          type: string
+          nullable: true
+        VendorTaxId:
+          type: string
+          nullable: true
+        VendorAddress:
+          type: string
+          nullable: true
+        VendorAddressRecipient:
+          type: string
+          nullable: true
+        CustomerAddress:
+          type: string
+          nullable: true
+        CustomerTaxId:
+          type: string
+          nullable: true
+        CustomerAddressRecipient:
+          type: string
+          nullable: true
+        BillingAddress:
+          type: string
+          nullable: true
+        BillingAddressRecipient:
+          type: string
+          nullable: true
+        ShippingAddress:
+          type: string
+          nullable: true
+        ShippingAddressRecipient:
+          type: string
+          nullable: true
+        PaymentTerm:
+          type: string
+          nullable: true
+        SubTotal:
+          type: number
+          nullable: true
+        TotalTax:
+          type: number
+          nullable: true
+        InvoiceTotal:
+          type: number
+          nullable: true
+        AmountDue:
+          type: number
+          nullable: true
+        ServiceAddress:
+          type: string
+          nullable: true
+        ServiceAddressRecipient:
+          type: string
+          nullable: true
+        RemittanceAddress:
+          type: string
+          nullable: true
+        RemittanceAddressRecipient:
+          type: string
+          nullable: true
+        ServiceStartDate:
+          type: string
+          nullable: true
+        ServiceEndDate:
+          type: string
+          nullable: true
+        PreviousUnpaidBalance:
+          type: number
+          nullable: true
+        CurrencyCode:
+          type: string
+          nullable: true
+        KVKNumber:
+          type: string
+          nullable: true
+        PaymentDetails:
+          type: array
+          items:
+            type: string
+          nullable: true
+        TotalDiscount:
+          type: number
+          nullable: true
+        TaxItems:
+          type: array
+          items:
+            type: string
+          nullable: true
+        LineItems:
+          type: array
+          items:
+            $ref: "#/components/schemas/LineItem"
+          nullable: true
+        AdditionalItems:
+          type: array
+          items:
+            $ref: "#/components/schemas/AdditionalField"
+          nullable: true
+
+    BankStatement:
+      type: object
+      properties:
+        CustomerName:
+          type: string
+          nullable: true
+        AccountNumber:
+          type: string
+          nullable: true
+        BankName:
+          type: string
+          nullable: true
+        BankAddress:
+          type: string
+          nullable: true
+        PeriodStartDate:
+          type: string
+          nullable: true
+        PeriodEndDate:
+          type: string
+          nullable: true
+        LineItems:
+          type: array
+          items:
+            $ref: "#/components/schemas/BankLineItem"
+          nullable: true
+
+    Receipt:
+      type: object
+      properties:
+        MerchantName:
+          type: string
+          nullable: true
+        MerchantPhoneNumber:
+          type: string
+          nullable: true
+        MerchantAddress:
+          type: string
+          nullable: true
+        Total:
+          type: number
+          nullable: true
+        TransactionDate:
+          type: string
+          nullable: true
+        TransactionTime:
+          type: string
+          nullable: true
+        Subtotal:
+          type: number
+          nullable: true
+        TotalTax:
+          type: number
+          nullable: true
+        Tip:
+          type: number
+          nullable: true
+        Items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Item"
+          nullable: true
+        TaxDetails:
+          type: array
+          items:
+            $ref: "#/components/schemas/TaxDetail"
+          nullable: true
+        AdditionalItems:
+          type: array
+          items:
+            $ref: "#/components/schemas/AdditionalField"
+          nullable: true
+
+    LineItem:
+      type: object
+      properties:
+        Items:
+          type: string
+          nullable: true
+        Amount:
+          type: number
+          nullable: true
+        Description:
+          type: string
+          nullable: true
+        Quantity:
+          type: number
+          nullable: true
+        UnitPrice:
+          type: number
+          nullable: true
+        ProductCode:
+          type: string
+          nullable: true
+        Unit:
+          type: string
+          nullable: true
+        Date:
+          type: string
+          nullable: true
+        Tax:
+          type: number
+          nullable: true
+        TaxRate:
+          type: number
+          nullable: true
+
+    AdditionalField:
+      type: object
+      properties:
+        FieldName:
+          type: string
+          nullable: true
+        FieldValue:
+          type: string
+          nullable: true
+
+    BankLineItem:
+      type: object
+      properties:
+        Date:
+          type: string
+          nullable: true
+        Description:
+          type: string
+          nullable: true
+        Amount:
+          type: number
+          nullable: true
+
+    Item:
+      type: object
+      properties:
+        TotalPrice:
+          type: number
+          nullable: true
+        Description:
+          type: string
+          nullable: true
+        Quantity:
+          type: number
+          nullable: true
+        Price:
+          type: number
+          nullable: true
+        ProductCode:
+          type: string
+          nullable: true
+        QuantityUnit:
+          type: string
+          nullable: true
+
+    TaxDetail:
+      type: object
+      properties:
+        Amount:
+          type: number
+          nullable: true
+
+security:
+  - ApiKeyAuth: []
